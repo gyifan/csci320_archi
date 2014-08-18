@@ -1,0 +1,63 @@
+CSCI320, PinCache Lab
+Thiago Fujisaka Tanaka (tft003)
+Yifan Ge (ygg001)
+
+Question 1
+1) pincache sends the [physical data] memory address to the cache simulator.
+Inside static VOID instruction function in pincache.cpp, the pin tool inserts simulate_access function before each instruction gets executed. The parameter it passes to simulate_access is the index of operands with IARG_MEMORYOP_EA flag, which according to the Pin User Guide means the effective memory address.
+
+2) True. Pincache allocates on both read and write.
+
+3) DM miss ratio on `tar czf ...` with the given total cache size with 64 byte blocks
+   4K	11.5911%
+  32K	2.41451%
+ 256K	1.33965%
+2048K	1.13027%
+
+4) 2-way associative miss ratio on `tar czf ...` with the given total cache size with 64 byte blocks and LRU replacement
+   4K	8.73969%
+  32K	2.02361%
+ 256K	1.02907%
+2048K 	0.952413%
+
+5) 4-way associative miss ratio on `tar czf ...` with the given total cache size with 64 byte blocks and LRU replacement
+   4K	7.48614%
+  32K	1.45525%
+ 256K	0.932331%
+2048K 	0.886399%
+
+6) 8-way associative miss ratio on `tar czf ...` with the given total cache size with 64 byte blocks and LRU replacement
+   4K	6.69506%
+  32K	1.39599%
+ 256K	0.89857%
+2048K 	0.865664%
+
+7) fully associative miss ratio on `tar czf ...` with the given total cache size with 64 byte blocks and LRU replacement
+   4K	6.66957%
+  32K	1.3491%
+ 256K	0.888775%
+2048K 	0.850893%
+
+8) the speedup by prefetching the next cache block for the tar/gzip workload is 1.0024 .
+
+The speed up = old execution time / new execution time
+             = old AMAT / new AMAT
+	     = (hit time + miss rate * miss penalty)old / (hit time + miss rate * miss penalty)new
+assuming miss penalty = hit time
+
+speed up = (1 + old miss rate) / (1 + miss rate with prefetch)
+
+We tested 4K 8-way associative cache with 64B blocksize. It gives us miss rates: 
+	6.87419% w/o prefetch. 	6.608% w/ prefectch
+So,
+	speedup in this case = 1.0024
+
+
+Folder description:
+cache_prefetch.c => cache with prefetch implemented
+cache_original.c => standard cache w/o prefetch
+
+<To run the plot script>
+	sh shellscript.sh
+
+This will generate three png files in the folder. 

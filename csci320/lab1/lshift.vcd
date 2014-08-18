@@ -1,0 +1,100 @@
+$date
+	Tue Sep  3 12:00:04 2013
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module lshift $end
+$var reg 8 ! A [7:0] $end
+$scope begin stop_at $end
+$upscope $end
+$scope begin Init $end
+$upscope $end
+$scope begin main_process $end
+$var integer 32 " i [31:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+b0 "
+b1 !
+$end
+#1
+b1 "
+b10 !
+#2
+b10 "
+b100 !
+#3
+b11 "
+b1000 !
+#4
+b100 "
+b10000 !
+#5
+b101 "
+b100000 !
+#6
+b110 "
+b1000000 !
+#7
+b111 "
+b10000000 !
+#8
+b0 "
+b1 !
+#9
+b1 "
+b10 !
+#10
+b10 "
+b100 !
+#11
+b11 "
+b1000 !
+#12
+b100 "
+b10000 !
+#13
+b101 "
+b100000 !
+#14
+b110 "
+b1000000 !
+#15
+b111 "
+b10000000 !
+#16
+b0 "
+b1 !
+#17
+b1 "
+b10 !
+#18
+b10 "
+b100 !
+#19
+b11 "
+b1000 !
+#20
+b100 "
+b10000 !
+#21
+b101 "
+b100000 !
+#22
+b110 "
+b1000000 !
+#23
+b111 "
+b10000000 !
+#24
+b0 "
+b1 !
+#25
+b1 "
+b10 !

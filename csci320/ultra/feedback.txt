@@ -1,0 +1,7 @@
+Feedback for Ultra3 lab (60 points)
+9/10: subtract implemented (You weren't supposed to use the Verilog - operator... but it was trivial to invert (2's compliment) and add.)
+20/20: multiply implemented (Interesting mul implementation (here you were allowed to use *), in hardware I think this while loop would be a bad idea.)
+20/20: branch implemented (Good)
+10/10: CPI and MIPS computed (Good)
+------------------------------
+Total Score: 59/60

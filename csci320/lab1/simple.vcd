@@ -1,0 +1,61 @@
+$date
+	Tue Sep  3 11:46:29 2013
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module simple $end
+$var reg 8 ! A [7:0] $end
+$var reg 8 " B [7:0] $end
+$var reg 1 # C $end
+$scope begin stop_at $end
+$upscope $end
+$scope begin Init $end
+$upscope $end
+$scope begin main_process $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+x#
+bx "
+b0 !
+$end
+#1
+b1 !
+#2
+b1110xxxx "
+#3
+0#
+#4
+b10 !
+#5
+b1101xxxx "
+#7
+b11 !
+#8
+b1100xxxx "
+#9
+1#
+#10
+b100 !
+#11
+b1011xxxx "
+#12
+0#
+#13
+b101 !
+#14
+b1010xxxx "
+#16
+b110 !
+#17
+b1001xxxx "
+#19
+b111 !
+#20
+b1000xxxx "

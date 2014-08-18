@@ -1,0 +1,8 @@
+
+50/50 README file provides required information
+50/50 correctly executes book example (given here)
+30/30 correctly executes loop example (given here)
+30/30 1-2 work with different functional unit latency
+
+
+160/160

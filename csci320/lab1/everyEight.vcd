@@ -1,0 +1,70 @@
+$date
+	Tue Sep  3 11:43:40 2013
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module everyEight $end
+$var reg 1 ! A $end
+$scope begin stop_at $end
+$upscope $end
+$scope begin Init $end
+$upscope $end
+$scope begin main_process $end
+$var integer 32 " i [31:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+bx "
+1!
+$end
+#1
+b0 "
+0!
+#2
+b1 "
+#3
+b10 "
+#4
+b11 "
+#5
+b100 "
+#6
+b101 "
+#7
+b110 "
+#8
+1!
+b111 "
+#9
+b0 "
+0!
+#10
+b1 "
+#11
+b10 "
+#12
+b11 "
+#13
+b100 "
+#14
+b101 "
+#15
+b110 "
+#16
+1!
+b111 "
+#17
+b0 "
+0!
+#18
+b1 "
+#19
+b10 "
+#20
+b11 "

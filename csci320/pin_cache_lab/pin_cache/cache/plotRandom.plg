@@ -1,0 +1,11 @@
+set title "Pincache (RANDOM replacement policy)"
+set terminal png size 800,600
+set output 'results-RANDOM.png'
+set xlabel "Cache size"
+set logscale x 2
+set ylabel "Miss rate"
+plot "plotRandom.dat" using 1:2 title '1-way' with lines, \
+"plotRandom.dat" using 1:3 title '2-way' with lines, \
+"plotRandom.dat" using 1:4 title '4-way' with lines, \
+"plotRandom.dat" using 1:5 title '8-way' with lines, \
+"plotRandom.dat" using 1:6 title 'Fully' with lines

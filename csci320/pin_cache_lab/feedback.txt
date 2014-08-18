@@ -1,0 +1,17 @@
+140 points total plus the possibility of 20 bonus points.
+
+[10] q1 & q2: 5 points each
+[5] q3: 5 points
+[10] test1 works: 10 points
+[10] test2 created and checks fully associative cache
+[20] q4-q7: 5 points each
+[15] test3 checks LRU, RANDOM, and FIFO replacement, 5 points each
+[30] result.png or pdf looks good
+3/[5] test5 verifies hardware prefetch of next line
+
+	I don't see how this verifies prefetch
+	
+[5] q8: speedup calculation is correct given simulation results
+
+
+138 / 140

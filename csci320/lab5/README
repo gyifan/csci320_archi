@@ -1,0 +1,1472 @@
+CSCI 320 - Computer Architecture
+Lab 5 - Soreboard with branch - continued Lab4
+Author: Yifan Ge
+Original submission: 9/24/2013
+*edited: 10/7/2013
+*edited: 10/21/2013
+
+======================================================
+Program Description:
+======================================================
+/* scoreboard */
+
+This implementation of scoreboard is based on instruction structure and register struct. 
+
+At the beginning, the program will read the instructions from the program file. It will set the 
+the function unit number and execution clock cycles from the config command. Then it parse the 
+instructions and initialize the array of instructions based on the input. The values in each
+instruction struct will be set accordingly. 
+
+These are the detailed description on the Reg and Instr structs.
+
+typedef struct{
+	int type; 	// either FLOAT or INT
+	int write;	// stores the instr index that is writing to it. initialized as -1
+	int read;	// stores the instr index that is reading it. if multiple instruction
+			// is reading it, it will restore the highest index. initialized as -1
+} Reg;
+
+typedef struct{
+	int updateRD;   // finished reading, need update.
+	int updateWR;	// just finished writeback, need update.
+	int done;	// initialized as 0;
+	int issued;	// initialized as 0;
+	int* fu; 	// Function unit
+	Reg* rd;	// Destination register
+	Reg* rs1;	// Source register 1
+	Reg* rs2;	// Source register 2
+	int counterEX;	// initiated as -1, counts how many clocks in EX
+	int clockEX;	// clock needed for this executing instruction
+	int waitIndex;	// instruction index this instruction is waiting. Default(-1)
+	int issue;	// clock cycle issued, default -1
+	int read;	// clock cycle read operands, default -1
+	int ex;		// clock cycle executed operands, default -1
+	int wb;		// clack cycle wroteback, default -1
+	char name[20];	// stores the name of the instruction;
+} Instr;
+
+Before processing. the program will initialize pc and clock to 0. These variable will keep track the 
+current pc and clock cycle. The main processing process can be categorize into two parts:issue, and
+process. The program will execute issue and process once per loop and increment the clock cycle, until
+all the instructions are finished OR the maximum clock cycle is reached. 
+
+During issue stage, the processor will try to issue the instruction at the pc index. If it's 
+successfully issued, the pc is incremented. Otherwise the pc stays and processor will try to issue
+the same instruction again next clock cycle.
+
+During processing stage, the processor will loop through all the ISSUED instruction once. Only if the 
+done property in the instruction struct is not set, the processor will process the instruction and 
+updates its values in the structs. Since the register in the struct are stored as pointers, the processor
+will be able to check and update the register status list as well. The usage of pointers is the novel 
+part of this C implementation.
+
+After all instructions are executed it will prints the issue, read, ex, and wb properties of each 
+instruction, which should contains the clock cycles when each stage finished. 
+
+**Branch implementation**
+
+In this version of scoreboard, the branch is implemented based on the given taken or not taken data in 
+the program file. It will only take one branch at a time, which means no other branches can be executed
+within a loop. Also, the branch prediction is assumed in the implementation. The following is the detailed
+implementation.
+
+During instruction initialization stage, if the program opcode is in the format of: "Label":Opcode, the 
+scoreboard will save the location of the label. Then When BNEZ opcode is read later in the program, the 
+scoreboard will read the next line. For each char before N, the instructions between the Label and BNEZ are 
+repeatedly loaded in the instruction array. 
+
+==========================================================
+Program Usage
+==========================================================
+
+To use this score board implementation, the user can use the following command:
+
+	$ scoreboard nameOfProgramFile 
+
+The program file contains the scoreboard configuration and instructions. The following rules are 
+required:
+	1. The configuration are set at the beginning of the program file. The user will be able to set
+	   .integer, .mult, .add, .div. 
+	   e.g.
+	         .integer numberOfUnit executionCycles
+	2. The instructions have to be supported by the program. This is the current supported instruction
+	   list:
+		LD		Fi, i(Rk)
+		MULTD		Fi, Fj, Fk
+		ADDD		Fi, Fj, Fk
+		SUBD		Fi, Fj, Fk
+		DIVD		Fi, Fj, Fk
+
+==========================================================
+Examples 
+==========================================================
+
+[Example 1.]
+
+Following is the output for processing the sample.code in the data directory.
+
+Command:
+	$ ./bin/scoreboard ./data/sample.code
+ 
+Output:
+
+Initializing the Scoreboard Parameters ... ...
+Finished initialization 
+Loading program ./data/sample.code ... ... 
+loaded LD    F6,  34(R2)
+loaded LD    F2,  45(R3)
+loaded MULTD F0,  F2, F4
+loaded SUBD  F8,  F6, F2
+loaded DIVD  F10, F0, F6
+loaded ADDD  F6,  F8, F2
+==================================
+ Executing ... ... 
+==================================
+==================================
+ Execution is DONE! 
+==================================
+
+ Printing Results ... ...
+===============================================================
+                                  	Read		Execute		Write
+                            Issue	Operands	Complete	Result
+                      --------------------------------------------------------------
+LD    F6,  34(R2)		1		2		3		4
+LD    F2,  45(R3)		5		6		7		8
+MULTD F0,  F2, F4		6		9		19		20
+SUBD  F8,  F6, F2		7		9		11		12
+DIVD  F10, F0, F6		8		21		61		62
+ADDD  F6,  F8, F2		13		14		16		22
+
+--------------------------------------------------------------------------------------------
+
+[Example 2.]
+
+Following is the output for processing the sample_branch.code in the data directory.
+
+Command:
+	$ ./bin/scoreboard ./data/sample_branch.code
+ 
+Output:
+
+Initializing the Scoreboard Parameters ... ...
+Finished initialization 
+Loading program ./data/sample_branch.code ... ... 
+Create 1 Integer Function Unit with 1 Execution Cycles
+Create 2 mult Function Unit with 10 Execution Cycles
+Create 1 Add Function Unit with 2 Execution Cycles
+Create 1 Div Function Unit with 40 Execution Cycles
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+loading branches... ... ... 
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: T
+loaded Loop:LW	R1, 0(R2) ;
+loaded ADDI	R1, R1, #1 ;
+loaded SW	R1, 0(R2) ; 
+loaded ADDI	R2, R2, #4 ;
+loaded SUB	R4, R3, R2 ;
+loaded BNEZ	R4, Loop ;
+Branch is: N
+loaded branches: TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTN 
+==================================
+ Executing ... ... 
+==================================
+==================================
+ Execution is DONE! 
+==================================
+
+ Printing Results ... ...
+===============================================================
+                                  	Read		Execute		Write
+                            Issue	Operands	Complete	Result
+                      --------------------------------------------------------------
+Loop:LW	R1, 0(R2) ;		1		2		3		4
+ADDI	R1, R1, #1 ;		5		6		7		8
+SW	R1, 0(R2) ; 		9		10		11		12
+ADDI	R2, R2, #4 ;		13		14		15		16
+SUB	R4, R3, R2 ;		17		18		19		20
+BNEZ	R4, Loop ;		21		22		23		24
+Loop:LW	R1, 0(R2) ;		25		26		27		28
+ADDI	R1, R1, #1 ;		29		30		31		32
+SW	R1, 0(R2) ; 		33		34		35		36
+ADDI	R2, R2, #4 ;		37		38		39		40
+SUB	R4, R3, R2 ;		41		42		43		44
+BNEZ	R4, Loop ;		45		46		47		48
+Loop:LW	R1, 0(R2) ;		49		50		51		52
+ADDI	R1, R1, #1 ;		53		54		55		56
+SW	R1, 0(R2) ; 		57		58		59		60
+ADDI	R2, R2, #4 ;		61		62		63		64
+SUB	R4, R3, R2 ;		65		66		67		68
+BNEZ	R4, Loop ;		69		70		71		72
+Loop:LW	R1, 0(R2) ;		73		74		75		76
+ADDI	R1, R1, #1 ;		77		78		79		80
+SW	R1, 0(R2) ; 		81		82		83		84
+ADDI	R2, R2, #4 ;		85		86		87		88
+SUB	R4, R3, R2 ;		89		90		91		92
+BNEZ	R4, Loop ;		93		94		95		96
+Loop:LW	R1, 0(R2) ;		97		98		99		100
+ADDI	R1, R1, #1 ;		101		102		103		104
+SW	R1, 0(R2) ; 		105		106		107		108
+ADDI	R2, R2, #4 ;		109		110		111		112
+SUB	R4, R3, R2 ;		113		114		115		116
+BNEZ	R4, Loop ;		117		118		119		120
+Loop:LW	R1, 0(R2) ;		121		122		123		124
+ADDI	R1, R1, #1 ;		125		126		127		128
+SW	R1, 0(R2) ; 		129		130		131		132
+ADDI	R2, R2, #4 ;		133		134		135		136
+SUB	R4, R3, R2 ;		137		138		139		140
+BNEZ	R4, Loop ;		141		142		143		144
+Loop:LW	R1, 0(R2) ;		145		146		147		148
+ADDI	R1, R1, #1 ;		149		150		151		152
+SW	R1, 0(R2) ; 		153		154		155		156
+ADDI	R2, R2, #4 ;		157		158		159		160
+SUB	R4, R3, R2 ;		161		162		163		164
+BNEZ	R4, Loop ;		165		166		167		168
+Loop:LW	R1, 0(R2) ;		169		170		171		172
+ADDI	R1, R1, #1 ;		173		174		175		176
+SW	R1, 0(R2) ; 		177		178		179		180
+ADDI	R2, R2, #4 ;		181		182		183		184
+SUB	R4, R3, R2 ;		185		186		187		188
+BNEZ	R4, Loop ;		189		190		191		192
+Loop:LW	R1, 0(R2) ;		193		194		195		196
+ADDI	R1, R1, #1 ;		197		198		199		200
+SW	R1, 0(R2) ; 		201		202		203		204
+ADDI	R2, R2, #4 ;		205		206		207		208
+SUB	R4, R3, R2 ;		209		210		211		212
+BNEZ	R4, Loop ;		213		214		215		216
+Loop:LW	R1, 0(R2) ;		217		218		219		220
+ADDI	R1, R1, #1 ;		221		222		223		224
+SW	R1, 0(R2) ; 		225		226		227		228
+ADDI	R2, R2, #4 ;		229		230		231		232
+SUB	R4, R3, R2 ;		233		234		235		236
+BNEZ	R4, Loop ;		237		238		239		240
+Loop:LW	R1, 0(R2) ;		241		242		243		244
+ADDI	R1, R1, #1 ;		245		246		247		248
+SW	R1, 0(R2) ; 		249		250		251		252
+ADDI	R2, R2, #4 ;		253		254		255		256
+SUB	R4, R3, R2 ;		257		258		259		260
+BNEZ	R4, Loop ;		261		262		263		264
+Loop:LW	R1, 0(R2) ;		265		266		267		268
+ADDI	R1, R1, #1 ;		269		270		271		272
+SW	R1, 0(R2) ; 		273		274		275		276
+ADDI	R2, R2, #4 ;		277		278		279		280
+SUB	R4, R3, R2 ;		281		282		283		284
+BNEZ	R4, Loop ;		285		286		287		288
+Loop:LW	R1, 0(R2) ;		289		290		291		292
+ADDI	R1, R1, #1 ;		293		294		295		296
+SW	R1, 0(R2) ; 		297		298		299		300
+ADDI	R2, R2, #4 ;		301		302		303		304
+SUB	R4, R3, R2 ;		305		306		307		308
+BNEZ	R4, Loop ;		309		310		311		312
+Loop:LW	R1, 0(R2) ;		313		314		315		316
+ADDI	R1, R1, #1 ;		317		318		319		320
+SW	R1, 0(R2) ; 		321		322		323		324
+ADDI	R2, R2, #4 ;		325		326		327		328
+SUB	R4, R3, R2 ;		329		330		331		332
+BNEZ	R4, Loop ;		333		334		335		336
+Loop:LW	R1, 0(R2) ;		337		338		339		340
+ADDI	R1, R1, #1 ;		341		342		343		344
+SW	R1, 0(R2) ; 		345		346		347		348
+ADDI	R2, R2, #4 ;		349		350		351		352
+SUB	R4, R3, R2 ;		353		354		355		356
+BNEZ	R4, Loop ;		357		358		359		360
+Loop:LW	R1, 0(R2) ;		361		362		363		364
+ADDI	R1, R1, #1 ;		365		366		367		368
+SW	R1, 0(R2) ; 		369		370		371		372
+ADDI	R2, R2, #4 ;		373		374		375		376
+SUB	R4, R3, R2 ;		377		378		379		380
+BNEZ	R4, Loop ;		381		382		383		384
+Loop:LW	R1, 0(R2) ;		385		386		387		388
+ADDI	R1, R1, #1 ;		389		390		391		392
+SW	R1, 0(R2) ; 		393		394		395		396
+ADDI	R2, R2, #4 ;		397		398		399		400
+SUB	R4, R3, R2 ;		401		402		403		404
+BNEZ	R4, Loop ;		405		406		407		408
+Loop:LW	R1, 0(R2) ;		409		410		411		412
+ADDI	R1, R1, #1 ;		413		414		415		416
+SW	R1, 0(R2) ; 		417		418		419		420
+ADDI	R2, R2, #4 ;		421		422		423		424
+SUB	R4, R3, R2 ;		425		426		427		428
+BNEZ	R4, Loop ;		429		430		431		432
+Loop:LW	R1, 0(R2) ;		433		434		435		436
+ADDI	R1, R1, #1 ;		437		438		439		440
+SW	R1, 0(R2) ; 		441		442		443		444
+ADDI	R2, R2, #4 ;		445		446		447		448
+SUB	R4, R3, R2 ;		449		450		451		452
+BNEZ	R4, Loop ;		453		454		455		456
+Loop:LW	R1, 0(R2) ;		457		458		459		460
+ADDI	R1, R1, #1 ;		461		462		463		464
+SW	R1, 0(R2) ; 		465		466		467		468
+ADDI	R2, R2, #4 ;		469		470		471		472
+SUB	R4, R3, R2 ;		473		474		475		476
+BNEZ	R4, Loop ;		477		478		479		480
+Loop:LW	R1, 0(R2) ;		481		482		483		484
+ADDI	R1, R1, #1 ;		485		486		487		488
+SW	R1, 0(R2) ; 		489		490		491		492
+ADDI	R2, R2, #4 ;		493		494		495		496
+SUB	R4, R3, R2 ;		497		498		499		500
+BNEZ	R4, Loop ;		501		502		503		504
+Loop:LW	R1, 0(R2) ;		505		506		507		508
+ADDI	R1, R1, #1 ;		509		510		511		512
+SW	R1, 0(R2) ; 		513		514		515		516
+ADDI	R2, R2, #4 ;		517		518		519		520
+SUB	R4, R3, R2 ;		521		522		523		524
+BNEZ	R4, Loop ;		525		526		527		528
+Loop:LW	R1, 0(R2) ;		529		530		531		532
+ADDI	R1, R1, #1 ;		533		534		535		536
+SW	R1, 0(R2) ; 		537		538		539		540
+ADDI	R2, R2, #4 ;		541		542		543		544
+SUB	R4, R3, R2 ;		545		546		547		548
+BNEZ	R4, Loop ;		549		550		551		552
+Loop:LW	R1, 0(R2) ;		553		554		555		556
+ADDI	R1, R1, #1 ;		557		558		559		560
+SW	R1, 0(R2) ; 		561		562		563		564
+ADDI	R2, R2, #4 ;		565		566		567		568
+SUB	R4, R3, R2 ;		569		570		571		572
+BNEZ	R4, Loop ;		573		574		575		576
+Loop:LW	R1, 0(R2) ;		577		578		579		580
+ADDI	R1, R1, #1 ;		581		582		583		584
+SW	R1, 0(R2) ; 		585		586		587		588
+ADDI	R2, R2, #4 ;		589		590		591		592
+SUB	R4, R3, R2 ;		593		594		595		596
+BNEZ	R4, Loop ;		597		598		599		600
+Loop:LW	R1, 0(R2) ;		601		602		603		604
+ADDI	R1, R1, #1 ;		605		606		607		608
+SW	R1, 0(R2) ; 		609		610		611		612
+ADDI	R2, R2, #4 ;		613		614		615		616
+SUB	R4, R3, R2 ;		617		618		619		620
+BNEZ	R4, Loop ;		621		622		623		624
+Loop:LW	R1, 0(R2) ;		625		626		627		628
+ADDI	R1, R1, #1 ;		629		630		631		632
+SW	R1, 0(R2) ; 		633		634		635		636
+ADDI	R2, R2, #4 ;		637		638		639		640
+SUB	R4, R3, R2 ;		641		642		643		644
+BNEZ	R4, Loop ;		645		646		647		648
+Loop:LW	R1, 0(R2) ;		649		650		651		652
+ADDI	R1, R1, #1 ;		653		654		655		656
+SW	R1, 0(R2) ; 		657		658		659		660
+ADDI	R2, R2, #4 ;		661		662		663		664
+SUB	R4, R3, R2 ;		665		666		667		668
+BNEZ	R4, Loop ;		669		670		671		672
+Loop:LW	R1, 0(R2) ;		673		674		675		676
+ADDI	R1, R1, #1 ;		677		678		679		680
+SW	R1, 0(R2) ; 		681		682		683		684
+ADDI	R2, R2, #4 ;		685		686		687		688
+SUB	R4, R3, R2 ;		689		690		691		692
+BNEZ	R4, Loop ;		693		694		695		696
+Loop:LW	R1, 0(R2) ;		697		698		699		700
+ADDI	R1, R1, #1 ;		701		702		703		704
+SW	R1, 0(R2) ; 		705		706		707		708
+ADDI	R2, R2, #4 ;		709		710		711		712
+SUB	R4, R3, R2 ;		713		714		715		716
+BNEZ	R4, Loop ;		717		718		719		720
+Loop:LW	R1, 0(R2) ;		721		722		723		724
+ADDI	R1, R1, #1 ;		725		726		727		728
+SW	R1, 0(R2) ; 		729		730		731		732
+ADDI	R2, R2, #4 ;		733		734		735		736
+SUB	R4, R3, R2 ;		737		738		739		740
+BNEZ	R4, Loop ;		741		742		743		744
+Loop:LW	R1, 0(R2) ;		745		746		747		748
+ADDI	R1, R1, #1 ;		749		750		751		752
+SW	R1, 0(R2) ; 		753		754		755		756
+ADDI	R2, R2, #4 ;		757		758		759		760
+SUB	R4, R3, R2 ;		761		762		763		764
+BNEZ	R4, Loop ;		765		766		767		768
+Loop:LW	R1, 0(R2) ;		769		770		771		772
+ADDI	R1, R1, #1 ;		773		774		775		776
+SW	R1, 0(R2) ; 		777		778		779		780
+ADDI	R2, R2, #4 ;		781		782		783		784
+SUB	R4, R3, R2 ;		785		786		787		788
+BNEZ	R4, Loop ;		789		790		791		792
+Loop:LW	R1, 0(R2) ;		793		794		795		796
+ADDI	R1, R1, #1 ;		797		798		799		800
+SW	R1, 0(R2) ; 		801		802		803		804
+ADDI	R2, R2, #4 ;		805		806		807		808
+SUB	R4, R3, R2 ;		809		810		811		812
+BNEZ	R4, Loop ;		813		814		815		816
+Loop:LW	R1, 0(R2) ;		817		818		819		820
+ADDI	R1, R1, #1 ;		821		822		823		824
+SW	R1, 0(R2) ; 		825		826		827		828
+ADDI	R2, R2, #4 ;		829		830		831		832
+SUB	R4, R3, R2 ;		833		834		835		836
+BNEZ	R4, Loop ;		837		838		839		840
+Loop:LW	R1, 0(R2) ;		841		842		843		844
+ADDI	R1, R1, #1 ;		845		846		847		848
+SW	R1, 0(R2) ; 		849		850		851		852
+ADDI	R2, R2, #4 ;		853		854		855		856
+SUB	R4, R3, R2 ;		857		858		859		860
+BNEZ	R4, Loop ;		861		862		863		864
+Loop:LW	R1, 0(R2) ;		865		866		867		868
+ADDI	R1, R1, #1 ;		869		870		871		872
+SW	R1, 0(R2) ; 		873		874		875		876
+ADDI	R2, R2, #4 ;		877		878		879		880
+SUB	R4, R3, R2 ;		881		882		883		884
+BNEZ	R4, Loop ;		885		886		887		888
+Loop:LW	R1, 0(R2) ;		889		890		891		892
+ADDI	R1, R1, #1 ;		893		894		895		896
+SW	R1, 0(R2) ; 		897		898		899		900
+ADDI	R2, R2, #4 ;		901		902		903		904
+SUB	R4, R3, R2 ;		905		906		907		908
+BNEZ	R4, Loop ;		909		910		911		912
+Loop:LW	R1, 0(R2) ;		913		914		915		916
+ADDI	R1, R1, #1 ;		917		918		919		920
+SW	R1, 0(R2) ; 		921		922		923		924
+ADDI	R2, R2, #4 ;		925		926		927		928
+SUB	R4, R3, R2 ;		929		930		931		932
+BNEZ	R4, Loop ;		933		934		935		936
+Loop:LW	R1, 0(R2) ;		937		938		939		940
+ADDI	R1, R1, #1 ;		941		942		943		944
+SW	R1, 0(R2) ; 		945		946		947		948
+ADDI	R2, R2, #4 ;		949		950		951		952
+SUB	R4, R3, R2 ;		953		954		955		956
+BNEZ	R4, Loop ;		957		958		959		960
+Loop:LW	R1, 0(R2) ;		961		962		963		964
+ADDI	R1, R1, #1 ;		965		966		967		968
+SW	R1, 0(R2) ; 		969		970		971		972
+ADDI	R2, R2, #4 ;		973		974		975		976
+SUB	R4, R3, R2 ;		977		978		979		980
+BNEZ	R4, Loop ;		981		982		983		984
+Loop:LW	R1, 0(R2) ;		985		986		987		988
+ADDI	R1, R1, #1 ;		989		990		991		992
+SW	R1, 0(R2) ; 		993		994		995		996
+ADDI	R2, R2, #4 ;		997		998		999		1000
+SUB	R4, R3, R2 ;		1001		1002		1003		1004
+BNEZ	R4, Loop ;		1005		1006		1007		1008
+Loop:LW	R1, 0(R2) ;		1009		1010		1011		1012
+ADDI	R1, R1, #1 ;		1013		1014		1015		1016
+SW	R1, 0(R2) ; 		1017		1018		1019		1020
+ADDI	R2, R2, #4 ;		1021		1022		1023		1024
+SUB	R4, R3, R2 ;		1025		1026		1027		1028
+BNEZ	R4, Loop ;		1029		1030		1031		1032
+Loop:LW	R1, 0(R2) ;		1033		1034		1035		1036
+ADDI	R1, R1, #1 ;		1037		1038		1039		1040
+SW	R1, 0(R2) ; 		1041		1042		1043		1044
+ADDI	R2, R2, #4 ;		1045		1046		1047		1048
+SUB	R4, R3, R2 ;		1049		1050		1051		1052
+BNEZ	R4, Loop ;		1053		1054		1055		1056
+Loop:LW	R1, 0(R2) ;		1057		1058		1059		1060
+ADDI	R1, R1, #1 ;		1061		1062		1063		1064
+SW	R1, 0(R2) ; 		1065		1066		1067		1068
+ADDI	R2, R2, #4 ;		1069		1070		1071		1072
+SUB	R4, R3, R2 ;		1073		1074		1075		1076
+BNEZ	R4, Loop ;		1077		1078		1079		1080
+Loop:LW	R1, 0(R2) ;		1081		1082		1083		1084
+ADDI	R1, R1, #1 ;		1085		1086		1087		1088
+SW	R1, 0(R2) ; 		1089		1090		1091		1092
+ADDI	R2, R2, #4 ;		1093		1094		1095		1096
+SUB	R4, R3, R2 ;		1097		1098		1099		1100
+BNEZ	R4, Loop ;		1101		1102		1103		1104
+Loop:LW	R1, 0(R2) ;		1105		1106		1107		1108
+ADDI	R1, R1, #1 ;		1109		1110		1111		1112
+SW	R1, 0(R2) ; 		1113		1114		1115		1116
+ADDI	R2, R2, #4 ;		1117		1118		1119		1120
+SUB	R4, R3, R2 ;		1121		1122		1123		1124
+BNEZ	R4, Loop ;		1125		1126		1127		1128
+Loop:LW	R1, 0(R2) ;		1129		1130		1131		1132
+ADDI	R1, R1, #1 ;		1133		1134		1135		1136
+SW	R1, 0(R2) ; 		1137		1138		1139		1140
+ADDI	R2, R2, #4 ;		1141		1142		1143		1144
+SUB	R4, R3, R2 ;		1145		1146		1147		1148
+BNEZ	R4, Loop ;		1149		1150		1151		1152
+Loop:LW	R1, 0(R2) ;		1153		1154		1155		1156
+ADDI	R1, R1, #1 ;		1157		1158		1159		1160
+SW	R1, 0(R2) ; 		1161		1162		1163		1164
+ADDI	R2, R2, #4 ;		1165		1166		1167		1168
+SUB	R4, R3, R2 ;		1169		1170		1171		1172
+BNEZ	R4, Loop ;		1173		1174		1175		1176
+Loop:LW	R1, 0(R2) ;		1177		1178		1179		1180
+ADDI	R1, R1, #1 ;		1181		1182		1183		1184
+SW	R1, 0(R2) ; 		1185		1186		1187		1188
+ADDI	R2, R2, #4 ;		1189		1190		1191		1192
+SUB	R4, R3, R2 ;		1193		1194		1195		1196
+BNEZ	R4, Loop ;		1197		1198		1199		1200
+Loop:LW	R1, 0(R2) ;		1201		1202		1203		1204
+ADDI	R1, R1, #1 ;		1205		1206		1207		1208
+SW	R1, 0(R2) ; 		1209		1210		1211		1212
+ADDI	R2, R2, #4 ;		1213		1214		1215		1216
+SUB	R4, R3, R2 ;		1217		1218		1219		1220
+BNEZ	R4, Loop ;		1221		1222		1223		1224
+Loop:LW	R1, 0(R2) ;		1225		1226		1227		1228
+ADDI	R1, R1, #1 ;		1229		1230		1231		1232
+SW	R1, 0(R2) ; 		1233		1234		1235		1236
+ADDI	R2, R2, #4 ;		1237		1238		1239		1240
+SUB	R4, R3, R2 ;		1241		1242		1243		1244
+BNEZ	R4, Loop ;		1245		1246		1247		1248
+Loop:LW	R1, 0(R2) ;		1249		1250		1251		1252
+ADDI	R1, R1, #1 ;		1253		1254		1255		1256
+SW	R1, 0(R2) ; 		1257		1258		1259		1260
+ADDI	R2, R2, #4 ;		1261		1262		1263		1264
+SUB	R4, R3, R2 ;		1265		1266		1267		1268
+BNEZ	R4, Loop ;		1269		1270		1271		1272
+Loop:LW	R1, 0(R2) ;		1273		1274		1275		1276
+ADDI	R1, R1, #1 ;		1277		1278		1279		1280
+SW	R1, 0(R2) ; 		1281		1282		1283		1284
+ADDI	R2, R2, #4 ;		1285		1286		1287		1288
+SUB	R4, R3, R2 ;		1289		1290		1291		1292
+BNEZ	R4, Loop ;		1293		1294		1295		1296
+Loop:LW	R1, 0(R2) ;		1297		1298		1299		1300
+ADDI	R1, R1, #1 ;		1301		1302		1303		1304
+SW	R1, 0(R2) ; 		1305		1306		1307		1308
+ADDI	R2, R2, #4 ;		1309		1310		1311		1312
+SUB	R4, R3, R2 ;		1313		1314		1315		1316
+BNEZ	R4, Loop ;		1317		1318		1319		1320
+Loop:LW	R1, 0(R2) ;		1321		1322		1323		1324
+ADDI	R1, R1, #1 ;		1325		1326		1327		1328
+SW	R1, 0(R2) ; 		1329		1330		1331		1332
+ADDI	R2, R2, #4 ;		1333		1334		1335		1336
+SUB	R4, R3, R2 ;		1337		1338		1339		1340
+BNEZ	R4, Loop ;		1341		1342		1343		1344
+Loop:LW	R1, 0(R2) ;		1345		1346		1347		1348
+ADDI	R1, R1, #1 ;		1349		1350		1351		1352
+SW	R1, 0(R2) ; 		1353		1354		1355		1356
+ADDI	R2, R2, #4 ;		1357		1358		1359		1360
+SUB	R4, R3, R2 ;		1361		1362		1363		1364
+BNEZ	R4, Loop ;		1365		1366		1367		1368
+Loop:LW	R1, 0(R2) ;		1369		1370		1371		1372
+ADDI	R1, R1, #1 ;		1373		1374		1375		1376
+SW	R1, 0(R2) ; 		1377		1378		1379		1380
+ADDI	R2, R2, #4 ;		1381		1382		1383		1384
+SUB	R4, R3, R2 ;		1385		1386		1387		1388
+BNEZ	R4, Loop ;		1389		1390		1391		1392
+Loop:LW	R1, 0(R2) ;		1393		1394		1395		1396
+ADDI	R1, R1, #1 ;		1397		1398		1399		1400
+SW	R1, 0(R2) ; 		1401		1402		1403		1404
+ADDI	R2, R2, #4 ;		1405		1406		1407		1408
+SUB	R4, R3, R2 ;		1409		1410		1411		1412
+BNEZ	R4, Loop ;		1413		1414		1415		1416
+Loop:LW	R1, 0(R2) ;		1417		1418		1419		1420
+ADDI	R1, R1, #1 ;		1421		1422		1423		1424
+SW	R1, 0(R2) ; 		1425		1426		1427		1428
+ADDI	R2, R2, #4 ;		1429		1430		1431		1432
+SUB	R4, R3, R2 ;		1433		1434		1435		1436
+BNEZ	R4, Loop ;		1437		1438		1439		1440
+Loop:LW	R1, 0(R2) ;		1441		1442		1443		1444
+ADDI	R1, R1, #1 ;		1445		1446		1447		1448
+SW	R1, 0(R2) ; 		1449		1450		1451		1452
+ADDI	R2, R2, #4 ;		1453		1454		1455		1456
+SUB	R4, R3, R2 ;		1457		1458		1459		1460
+BNEZ	R4, Loop ;		1461		1462		1463		1464
+Loop:LW	R1, 0(R2) ;		1465		1466		1467		1468
+ADDI	R1, R1, #1 ;		1469		1470		1471		1472
+SW	R1, 0(R2) ; 		1473		1474		1475		1476
+ADDI	R2, R2, #4 ;		1477		1478		1479		1480
+SUB	R4, R3, R2 ;		1481		1482		1483		1484
+BNEZ	R4, Loop ;		1485		1486		1487		1488
+Loop:LW	R1, 0(R2) ;		1489		1490		1491		1492
+ADDI	R1, R1, #1 ;		1493		1494		1495		1496
+SW	R1, 0(R2) ; 		1497		1498		1499		1500
+ADDI	R2, R2, #4 ;		1501		1502		1503		1504
+SUB	R4, R3, R2 ;		1505		1506		1507		1508
+BNEZ	R4, Loop ;		1509		1510		1511		1512
+Loop:LW	R1, 0(R2) ;		1513		1514		1515		1516
+ADDI	R1, R1, #1 ;		1517		1518		1519		1520
+SW	R1, 0(R2) ; 		1521		1522		1523		1524
+ADDI	R2, R2, #4 ;		1525		1526		1527		1528
+SUB	R4, R3, R2 ;		1529		1530		1531		1532
+BNEZ	R4, Loop ;		1533		1534		1535		1536
+Loop:LW	R1, 0(R2) ;		1537		1538		1539		1540
+ADDI	R1, R1, #1 ;		1541		1542		1543		1544
+SW	R1, 0(R2) ; 		1545		1546		1547		1548
+ADDI	R2, R2, #4 ;		1549		1550		1551		1552
+SUB	R4, R3, R2 ;		1553		1554		1555		1556
+BNEZ	R4, Loop ;		1557		1558		1559		1560
+Loop:LW	R1, 0(R2) ;		1561		1562		1563		1564
+ADDI	R1, R1, #1 ;		1565		1566		1567		1568
+SW	R1, 0(R2) ; 		1569		1570		1571		1572
+ADDI	R2, R2, #4 ;		1573		1574		1575		1576
+SUB	R4, R3, R2 ;		1577		1578		1579		1580
+BNEZ	R4, Loop ;		1581		1582		1583		1584
+Loop:LW	R1, 0(R2) ;		1585		1586		1587		1588
+ADDI	R1, R1, #1 ;		1589		1590		1591		1592
+SW	R1, 0(R2) ; 		1593		1594		1595		1596
+ADDI	R2, R2, #4 ;		1597		1598		1599		1600
+SUB	R4, R3, R2 ;		1601		1602		1603		1604
+BNEZ	R4, Loop ;		1605		1606		1607		1608
+Loop:LW	R1, 0(R2) ;		1609		1610		1611		1612
+ADDI	R1, R1, #1 ;		1613		1614		1615		1616
+SW	R1, 0(R2) ; 		1617		1618		1619		1620
+ADDI	R2, R2, #4 ;		1621		1622		1623		1624
+SUB	R4, R3, R2 ;		1625		1626		1627		1628
+BNEZ	R4, Loop ;		1629		1630		1631		1632
+Loop:LW	R1, 0(R2) ;		1633		1634		1635		1636
+ADDI	R1, R1, #1 ;		1637		1638		1639		1640
+SW	R1, 0(R2) ; 		1641		1642		1643		1644
+ADDI	R2, R2, #4 ;		1645		1646		1647		1648
+SUB	R4, R3, R2 ;		1649		1650		1651		1652
+BNEZ	R4, Loop ;		1653		1654		1655		1656
+Loop:LW	R1, 0(R2) ;		1657		1658		1659		1660
+ADDI	R1, R1, #1 ;		1661		1662		1663		1664
+SW	R1, 0(R2) ; 		1665		1666		1667		1668
+ADDI	R2, R2, #4 ;		1669		1670		1671		1672
+SUB	R4, R3, R2 ;		1673		1674		1675		1676
+BNEZ	R4, Loop ;		1677		1678		1679		1680
+Loop:LW	R1, 0(R2) ;		1681		1682		1683		1684
+ADDI	R1, R1, #1 ;		1685		1686		1687		1688
+SW	R1, 0(R2) ; 		1689		1690		1691		1692
+ADDI	R2, R2, #4 ;		1693		1694		1695		1696
+SUB	R4, R3, R2 ;		1697		1698		1699		1700
+BNEZ	R4, Loop ;		1701		1702		1703		1704
+Loop:LW	R1, 0(R2) ;		1705		1706		1707		1708
+ADDI	R1, R1, #1 ;		1709		1710		1711		1712
+SW	R1, 0(R2) ; 		1713		1714		1715		1716
+ADDI	R2, R2, #4 ;		1717		1718		1719		1720
+SUB	R4, R3, R2 ;		1721		1722		1723		1724
+BNEZ	R4, Loop ;		1725		1726		1727		1728
+Loop:LW	R1, 0(R2) ;		1729		1730		1731		1732
+ADDI	R1, R1, #1 ;		1733		1734		1735		1736
+SW	R1, 0(R2) ; 		1737		1738		1739		1740
+ADDI	R2, R2, #4 ;		1741		1742		1743		1744
+SUB	R4, R3, R2 ;		1745		1746		1747		1748
+BNEZ	R4, Loop ;		1749		1750		1751		1752
+Loop:LW	R1, 0(R2) ;		1753		1754		1755		1756
+ADDI	R1, R1, #1 ;		1757		1758		1759		1760
+SW	R1, 0(R2) ; 		1761		1762		1763		1764
+ADDI	R2, R2, #4 ;		1765		1766		1767		1768
+SUB	R4, R3, R2 ;		1769		1770		1771		1772
+BNEZ	R4, Loop ;		1773		1774		1775		1776
+Loop:LW	R1, 0(R2) ;		1777		1778		1779		1780
+ADDI	R1, R1, #1 ;		1781		1782		1783		1784
+SW	R1, 0(R2) ; 		1785		1786		1787		1788
+ADDI	R2, R2, #4 ;		1789		1790		1791		1792
+SUB	R4, R3, R2 ;		1793		1794		1795		1796
+BNEZ	R4, Loop ;		1797		1798		1799		1800
+Loop:LW	R1, 0(R2) ;		1801		1802		1803		1804
+ADDI	R1, R1, #1 ;		1805		1806		1807		1808
+SW	R1, 0(R2) ; 		1809		1810		1811		1812
+ADDI	R2, R2, #4 ;		1813		1814		1815		1816
+SUB	R4, R3, R2 ;		1817		1818		1819		1820
+BNEZ	R4, Loop ;		1821		1822		1823		1824
+Loop:LW	R1, 0(R2) ;		1825		1826		1827		1828
+ADDI	R1, R1, #1 ;		1829		1830		1831		1832
+SW	R1, 0(R2) ; 		1833		1834		1835		1836
+ADDI	R2, R2, #4 ;		1837		1838		1839		1840
+SUB	R4, R3, R2 ;		1841		1842		1843		1844
+BNEZ	R4, Loop ;		1845		1846		1847		1848
+Loop:LW	R1, 0(R2) ;		1849		1850		1851		1852
+ADDI	R1, R1, #1 ;		1853		1854		1855		1856
+SW	R1, 0(R2) ; 		1857		1858		1859		1860
+ADDI	R2, R2, #4 ;		1861		1862		1863		1864
+SUB	R4, R3, R2 ;		1865		1866		1867		1868
+BNEZ	R4, Loop ;		1869		1870		1871		1872
+Loop:LW	R1, 0(R2) ;		1873		1874		1875		1876
+ADDI	R1, R1, #1 ;		1877		1878		1879		1880
+SW	R1, 0(R2) ; 		1881		1882		1883		1884
+ADDI	R2, R2, #4 ;		1885		1886		1887		1888
+SUB	R4, R3, R2 ;		1889		1890		1891		1892
+BNEZ	R4, Loop ;		1893		1894		1895		1896
+Loop:LW	R1, 0(R2) ;		1897		1898		1899		1900
+ADDI	R1, R1, #1 ;		1901		1902		1903		1904
+SW	R1, 0(R2) ; 		1905		1906		1907		1908
+ADDI	R2, R2, #4 ;		1909		1910		1911		1912
+SUB	R4, R3, R2 ;		1913		1914		1915		1916
+BNEZ	R4, Loop ;		1917		1918		1919		1920
+Loop:LW	R1, 0(R2) ;		1921		1922		1923		1924
+ADDI	R1, R1, #1 ;		1925		1926		1927		1928
+SW	R1, 0(R2) ; 		1929		1930		1931		1932
+ADDI	R2, R2, #4 ;		1933		1934		1935		1936
+SUB	R4, R3, R2 ;		1937		1938		1939		1940
+BNEZ	R4, Loop ;		1941		1942		1943		1944
+Loop:LW	R1, 0(R2) ;		1945		1946		1947		1948
+ADDI	R1, R1, #1 ;		1949		1950		1951		1952
+SW	R1, 0(R2) ; 		1953		1954		1955		1956
+ADDI	R2, R2, #4 ;		1957		1958		1959		1960
+SUB	R4, R3, R2 ;		1961		1962		1963		1964
+BNEZ	R4, Loop ;		1965		1966		1967		1968
+Loop:LW	R1, 0(R2) ;		1969		1970		1971		1972
+ADDI	R1, R1, #1 ;		1973		1974		1975		1976
+SW	R1, 0(R2) ; 		1977		1978		1979		1980
+ADDI	R2, R2, #4 ;		1981		1982		1983		1984
+SUB	R4, R3, R2 ;		1985		1986		1987		1988
+BNEZ	R4, Loop ;		1989		1990		1991		1992
+Loop:LW	R1, 0(R2) ;		1993		1994		1995		1996
+ADDI	R1, R1, #1 ;		1997		1998		1999		2000
+SW	R1, 0(R2) ; 		2001		2002		2003		2004
+ADDI	R2, R2, #4 ;		2005		2006		2007		2008
+SUB	R4, R3, R2 ;		2009		2010		2011		2012
+BNEZ	R4, Loop ;		2013		2014		2015		2016
+Loop:LW	R1, 0(R2) ;		2017		2018		2019		2020
+ADDI	R1, R1, #1 ;		2021		2022		2023		2024
+SW	R1, 0(R2) ; 		2025		2026		2027		2028
+ADDI	R2, R2, #4 ;		2029		2030		2031		2032
+SUB	R4, R3, R2 ;		2033		2034		2035		2036
+BNEZ	R4, Loop ;		2037		2038		2039		2040
+Loop:LW	R1, 0(R2) ;		2041		2042		2043		2044
+ADDI	R1, R1, #1 ;		2045		2046		2047		2048
+SW	R1, 0(R2) ; 		2049		2050		2051		2052
+ADDI	R2, R2, #4 ;		2053		2054		2055		2056
+SUB	R4, R3, R2 ;		2057		2058		2059		2060
+BNEZ	R4, Loop ;		2061		2062		2063		2064
+Loop:LW	R1, 0(R2) ;		2065		2066		2067		2068
+ADDI	R1, R1, #1 ;		2069		2070		2071		2072
+SW	R1, 0(R2) ; 		2073		2074		2075		2076
+ADDI	R2, R2, #4 ;		2077		2078		2079		2080
+SUB	R4, R3, R2 ;		2081		2082		2083		2084
+BNEZ	R4, Loop ;		2085		2086		2087		2088
+Loop:LW	R1, 0(R2) ;		2089		2090		2091		2092
+ADDI	R1, R1, #1 ;		2093		2094		2095		2096
+SW	R1, 0(R2) ; 		2097		2098		2099		2100
+ADDI	R2, R2, #4 ;		2101		2102		2103		2104
+SUB	R4, R3, R2 ;		2105		2106		2107		2108
+BNEZ	R4, Loop ;		2109		2110		2111		2112
+Loop:LW	R1, 0(R2) ;		2113		2114		2115		2116
+ADDI	R1, R1, #1 ;		2117		2118		2119		2120
+SW	R1, 0(R2) ; 		2121		2122		2123		2124
+ADDI	R2, R2, #4 ;		2125		2126		2127		2128
+SUB	R4, R3, R2 ;		2129		2130		2131		2132
+BNEZ	R4, Loop ;		2133		2134		2135		2136
+Loop:LW	R1, 0(R2) ;		2137		2138		2139		2140
+ADDI	R1, R1, #1 ;		2141		2142		2143		2144
+SW	R1, 0(R2) ; 		2145		2146		2147		2148
+ADDI	R2, R2, #4 ;		2149		2150		2151		2152
+SUB	R4, R3, R2 ;		2153		2154		2155		2156
+BNEZ	R4, Loop ;		2157		2158		2159		2160
+Loop:LW	R1, 0(R2) ;		2161		2162		2163		2164
+ADDI	R1, R1, #1 ;		2165		2166		2167		2168
+SW	R1, 0(R2) ; 		2169		2170		2171		2172
+ADDI	R2, R2, #4 ;		2173		2174		2175		2176
+SUB	R4, R3, R2 ;		2177		2178		2179		2180
+BNEZ	R4, Loop ;		2181		2182		2183		2184
+Loop:LW	R1, 0(R2) ;		2185		2186		2187		2188
+ADDI	R1, R1, #1 ;		2189		2190		2191		2192
+SW	R1, 0(R2) ; 		2193		2194		2195		2196
+ADDI	R2, R2, #4 ;		2197		2198		2199		2200
+SUB	R4, R3, R2 ;		2201		2202		2203		2204
+BNEZ	R4, Loop ;		2205		2206		2207		2208
+Loop:LW	R1, 0(R2) ;		2209		2210		2211		2212
+ADDI	R1, R1, #1 ;		2213		2214		2215		2216
+SW	R1, 0(R2) ; 		2217		2218		2219		2220
+ADDI	R2, R2, #4 ;		2221		2222		2223		2224
+SUB	R4, R3, R2 ;		2225		2226		2227		2228
+BNEZ	R4, Loop ;		2229		2230		2231		2232
+Loop:LW	R1, 0(R2) ;		2233		2234		2235		2236
+ADDI	R1, R1, #1 ;		2237		2238		2239		2240
+SW	R1, 0(R2) ; 		2241		2242		2243		2244
+ADDI	R2, R2, #4 ;		2245		2246		2247		2248
+SUB	R4, R3, R2 ;		2249		2250		2251		2252
+BNEZ	R4, Loop ;		2253		2254		2255		2256
+Loop:LW	R1, 0(R2) ;		2257		2258		2259		2260
+ADDI	R1, R1, #1 ;		2261		2262		2263		2264
+SW	R1, 0(R2) ; 		2265		2266		2267		2268
+ADDI	R2, R2, #4 ;		2269		2270		2271		2272
+SUB	R4, R3, R2 ;		2273		2274		2275		2276
+BNEZ	R4, Loop ;		2277		2278		2279		2280
+Loop:LW	R1, 0(R2) ;		2281		2282		2283		2284
+ADDI	R1, R1, #1 ;		2285		2286		2287		2288
+SW	R1, 0(R2) ; 		2289		2290		2291		2292
+ADDI	R2, R2, #4 ;		2293		2294		2295		2296
+SUB	R4, R3, R2 ;		2297		2298		2299		2300
+BNEZ	R4, Loop ;		2301		2302		2303		2304
+Loop:LW	R1, 0(R2) ;		2305		2306		2307		2308
+ADDI	R1, R1, #1 ;		2309		2310		2311		2312
+SW	R1, 0(R2) ; 		2313		2314		2315		2316
+ADDI	R2, R2, #4 ;		2317		2318		2319		2320
+SUB	R4, R3, R2 ;		2321		2322		2323		2324
+BNEZ	R4, Loop ;		2325		2326		2327		2328
+Loop:LW	R1, 0(R2) ;		2329		2330		2331		2332
+ADDI	R1, R1, #1 ;		2333		2334		2335		2336
+SW	R1, 0(R2) ; 		2337		2338		2339		2340
+ADDI	R2, R2, #4 ;		2341		2342		2343		2344
+SUB	R4, R3, R2 ;		2345		2346		2347		2348
+BNEZ	R4, Loop ;		2349		2350		2351		2352
+Loop:LW	R1, 0(R2) ;		2353		2354		2355		2356
+ADDI	R1, R1, #1 ;		2357		2358		2359		2360
+SW	R1, 0(R2) ; 		2361		2362		2363		2364
+ADDI	R2, R2, #4 ;		2365		2366		2367		2368
+SUB	R4, R3, R2 ;		2369		2370		2371		2372
+BNEZ	R4, Loop ;		2373		2374		2375		2376
+Loop:LW	R1, 0(R2) ;		2377		2378		2379		2380
+ADDI	R1, R1, #1 ;		2381		2382		2383		2384
+SW	R1, 0(R2) ; 		2385		2386		2387		2388
+ADDI	R2, R2, #4 ;		2389		2390		2391		2392
+SUB	R4, R3, R2 ;		2393		2394		2395		2396
+BNEZ	R4, Loop ;		2397		2398		2399		2400

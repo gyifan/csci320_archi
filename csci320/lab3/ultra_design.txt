@@ -1,0 +1,350 @@
+CSCI 320 - Computer Architecture
+Lab 3 - 9/17/13
+Author: Yifan Ge
+
+====================================================================================
+Exercise 1
+====================================================================================
+
+High level design of Ultra2 v1
+
+Ultra processor uses 16-bit architecture and five-stage pipeline (IF, ID, EX,
+MEM, WB). It is equiped with 256 words memory and four 16-bit GP registers. 
+It has four instructions: 
+	* LOAD Rd, M
+	* STORE Rs, M
+	* ADD Rd, Rs, Rt
+	* JUMP M
+All of the instructions are 16 bits long. The funtionality of each bit in the
+instruction is described below:
+	[15:14] -> Opcode: b'00 LOAD, b'01 STORE, b'10 ADD, b'11 JUMP
+	[13:12] -> Destination register, Rd
+	[11:10] -> Source register, Rs
+	[9:8] 	-> Temp register, Rt
+	[7:0]	-> Memory address, M
+If Rd, Rs, Rt, and M are not used in the instruction, the corresponding bits 
+should be defined as 0 in the instruction. 
+
+Instruction             # Clocks        Stages Used             Pseudocode
+LOAD R[rd],M            4               IF, ID, MEM, WB         R[rd] = MEM[M]
+STORE R[rs],M           3               IF, ID, MEM             MEM[M] = R[rs]
+ADD R[rd],R[rs],R[rt]   4               IF, ID, EX, WB          R[rd] = R[rs]+R[rt]
+JUMP M                  2               IF, ID                  PC = M
+
+Memory usage is described as below:
+	MEM[0:9]      Reserved data storage (can be define before program start)
+	MEM[10:255]   Program storage and dynamic data storage
+The program will be stored starting at memory address 0.
+
+	Assembly instruction             Encoded machine code
+	LOAD	R1, 3                    16'b0001000000000011
+	LOAD	R2, 4                    16'b0010000000000100
+	ADD	R1, R1, R2               16'b1001011000000000
+	STORE	R1, 5                    16'b0100010000000101
+	JUMP	12                       16'b1100000000001100
+
+This peice of program initially loads 2 to R1, 1 to R2. Then it iteratively 
+adds R1 with R2 and store the result to R1 and MEM[5]. As we can see from the 
+output file below, R1 and MEM[5] changes as desired. The time for each 
+instruction also meets our design. So the program is working correctly.
+
+Output from ultra2:
+
+Time	PC	IR	opcode	R0	R1	R2	R3	M
+VCD info: dumpfile ultra.vcd opened for output.
+0	   11	0001000000000011	00	    0	    0	    0	    0	    x
+3	   11	0001000000000011	00	    0	    2	    0	    0	    x
+Time                    4
+4	   12	0010000000000100	00	    0	    2	    0	    0	    x
+7	   12	0010000000000100	00	    0	    2	    1	    0	    x
+Time                    8
+8	   13	1001011000000000	00	    0	    2	    1	    0	    x
+9	   13	1001011000000000	10	    0	    2	    1	    0	    x
+11	   13	1001011000000000	10	    0	    3	    1	    0	    x
+Time                   12
+12	   14	0100010000000101	10	    0	    3	    1	    0	    x
+13	   14	0100010000000101	01	    0	    3	    1	    0	    x
+14	   14	0100010000000101	01	    0	    3	    1	    0	    3
+15	   15	1100000000001100	01	    0	    3	    1	    0	    3
+16	   15	1100000000001100	11	    0	    3	    1	    0	    3
+17	   13	1001011000000000	11	    0	    3	    1	    0	    3
+18	   13	1001011000000000	10	    0	    3	    1	    0	    3
+20	   13	1001011000000000	10	    0	    4	    1	    0	    3
+Time                   21
+21	   14	0100010000000101	10	    0	    4	    1	    0	    3
+22	   14	0100010000000101	01	    0	    4	    1	    0	    3
+23	   14	0100010000000101	01	    0	    4	    1	    0	    4
+24	   15	1100000000001100	01	    0	    4	    1	    0	    4
+25	   15	1100000000001100	11	    0	    4	    1	    0	    4
+26	   13	1001011000000000	11	    0	    4	    1	    0	    4
+27	   13	1001011000000000	10	    0	    4	    1	    0	    4
+29	   13	1001011000000000	10	    0	    5	    1	    0	    4
+Time                   30
+30	   14	0100010000000101	10	    0	    5	    1	    0	    4
+31	   14	0100010000000101	01	    0	    5	    1	    0	    4
+32	   14	0100010000000101	01	    0	    5	    1	    0	    5
+33	   15	1100000000001100	01	    0	    5	    1	    0	    5
+34	   15	1100000000001100	11	    0	    5	    1	    0	    5
+35	   13	1001011000000000	11	    0	    5	    1	    0	    5
+36	   13	1001011000000000	10	    0	    5	    1	    0	    5
+38	   13	1001011000000000	10	    0	    6	    1	    0	    5
+Time                   39
+39	   14	0100010000000101	10	    0	    6	    1	    0	    5
+40	   14	0100010000000101	01	    0	    6	    1	    0	    5
+41	   14	0100010000000101	01	    0	    6	    1	    0	    6
+42	   15	1100000000001100	01	    0	    6	    1	    0	    6
+43	   15	1100000000001100	11	    0	    6	    1	    0	    6
+44	   13	1001011000000000	11	    0	    6	    1	    0	    6
+45	   13	1001011000000000	10	    0	    6	    1	    0	    6
+47	   13	1001011000000000	10	    0	    7	    1	    0	    6
+Time                   48
+48	   14	0100010000000101	10	    0	    7	    1	    0	    6
+49	   14	0100010000000101	01	    0	    7	    1	    0	    6
+50	   14	0100010000000101	01	    0	    7	    1	    0	    7
+51	   15	1100000000001100	01	    0	    7	    1	    0	    7
+52	   15	1100000000001100	11	    0	    7	    1	    0	    7
+53	   13	1001011000000000	11	    0	    7	    1	    0	    7
+54	   13	1001011000000000	10	    0	    7	    1	    0	    7
+56	   13	1001011000000000	10	    0	    8	    1	    0	    7
+Time                   57
+57	   14	0100010000000101	10	    0	    8	    1	    0	    7
+58	   14	0100010000000101	01	    0	    8	    1	    0	    7
+59	   14	0100010000000101	01	    0	    8	    1	    0	    8
+60	   15	1100000000001100	01	    0	    8	    1	    0	    8
+61	   15	1100000000001100	11	    0	    8	    1	    0	    8
+62	   13	1001011000000000	11	    0	    8	    1	    0	    8
+63	   13	1001011000000000	10	    0	    8	    1	    0	    8
+65	   13	1001011000000000	10	    0	    9	    1	    0	    8
+Time                   66
+66	   14	0100010000000101	10	    0	    9	    1	    0	    8
+67	   14	0100010000000101	01	    0	    9	    1	    0	    8
+68	   14	0100010000000101	01	    0	    9	    1	    0	    9
+69	   15	1100000000001100	01	    0	    9	    1	    0	    9
+70	   15	1100000000001100	11	    0	    9	    1	    0	    9
+71	   13	1001011000000000	11	    0	    9	    1	    0	    9
+72	   13	1001011000000000	10	    0	    9	    1	    0	    9
+74	   13	1001011000000000	10	    0	   10	    1	    0	    9
+Time                   75
+75	   14	0100010000000101	10	    0	   10	    1	    0	    9
+76	   14	0100010000000101	01	    0	   10	    1	    0	    9
+77	   14	0100010000000101	01	    0	   10	    1	    0	   10
+78	   15	1100000000001100	01	    0	   10	    1	    0	   10
+79	   15	1100000000001100	11	    0	   10	    1	    0	   10
+80	   13	1001011000000000	11	    0	   10	    1	    0	   10
+81	   13	1001011000000000	10	    0	   10	    1	    0	   10
+83	   13	1001011000000000	10	    0	   11	    1	    0	   10
+Time                   84
+84	   14	0100010000000101	10	    0	   11	    1	    0	   10
+85	   14	0100010000000101	01	    0	   11	    1	    0	   10
+86	   14	0100010000000101	01	    0	   11	    1	    0	   11
+87	   15	1100000000001100	01	    0	   11	    1	    0	   11
+88	   15	1100000000001100	11	    0	   11	    1	    0	   11
+89	   13	1001011000000000	11	    0	   11	    1	    0	   11
+90	   13	1001011000000000	10	    0	   11	    1	    0	   11
+92	   13	1001011000000000	10	    0	   12	    1	    0	   11
+Time                   93
+93	   14	0100010000000101	10	    0	   12	    1	    0	   11
+94	   14	0100010000000101	01	    0	   12	    1	    0	   11
+95	   14	0100010000000101	01	    0	   12	    1	    0	   12
+96	   15	1100000000001100	01	    0	   12	    1	    0	   12
+97	   15	1100000000001100	11	    0	   12	    1	    0	   12
+98	   13	1001011000000000	11	    0	   12	    1	    0	   12
+99	   13	1001011000000000	10	    0	   12	    1	    0	   12
+
+====================================================================================
+Exercise 2
+====================================================================================
+
+High level design of Ultra2 v2 with indirect addressing and fixed value R0
+
+Encoding design:
+        * Remove immediate addressing mode. 
+        * Keep the original opcode encoding scheme:00 Load, 01 Store, 10 Add, 11 Jump 
+        * In Load/Store instruction bits arrangement and functionaility are shown
+        * below:
+              opcode - [15:14] 2'b00 for Load, 2'b01 for Store
+              rd     - [13:12] Destination register
+              rs     - [11:10] Source register
+              rt     - [9:8]   unused: default to 2'b00
+              offest - [7:0]   offset
+	* In Jump instruction bits arrangement and functionality are shown
+	* below:
+              opcode - [15:14] 2'b11
+              rd     - [13:12] unused: default to 2'b00
+              rs     - [11:10] Source register
+              rt     - [9:8]   unused: default to 2'b00
+              offest - [7:0]   offset
+        * In Add instruction bits arrangement is the same.
+Therefore, the bits arrangements can be listed below:
+        * Load:  00 + rd + rs + 00 + offset
+        * Store: 01 + rd + rs + 00 + offset
+        * Add:   10 + rd + rs + rt + 8'b00000000
+        * Jump:  11 + 00 + rs + 00 + offset
+              
+Note: Any direct addressing memory can be assessed by setting rs = 2'b00
+
+Structure design:
+        * Load:       IF, ID, EX, MEM, WB
+        * Store:      IF, ID, EX, MEM
+        * Add:        IF, ID, EX, WB
+        * Jump:       IF, ID, EX
+
+Instruction             # Clocks        Stages Used             Pseudocode
+LOAD  R[rd],M(R[rs])        5           IF, ID, EX, MEM, WB     R[rd] = MEM[R[rs]+M]
+STORE R[rd],M(R[rs])        4           IF, ID, EX, MEM         MEM[R[rs]+M] = R[rd]
+ADD   R[rd],R[rs],R[rt]     4           IF, ID, EX, WB          R[rd] = R[rs]+R[rt]
+JUMP  M(R[rs])              3           IF, ID, EX              PC = R[rs]+M
+
+*Test code*:
+Memory usage is described as below:
+	MEM[0:9]      Reserved data storage (can be define before program start)
+	MEM[10:255]   Program storage and dynamic data storage
+The program will be stored starting at memory address 0.
+
+	Assembly instruction             Encoded machine code
+	LOAD	R3, 1                    16'b0011000000000001
+	LOAD	R2, 2(R3)                16'b0010110000000010
+	ADD	R2, R2, R2               16'b1010101000000000
+	STORE	R2, 6                    16'b0110000000000110
+	LOAD	R0, 6                    16'b0000000000000110
+	STORE	R2, 6(R3)                16'b0110110000000110
+	JUMP	10(R3)                   16'b1100110000001010
+
+This peice of program initially loads 2 to R3, 14 to R2. Then it iteratively 
+doubles R2 and store the result back to R2, MEM[6] and MEM[8]. As we can see 
+from the output file below, R2, MEM[6] and MEM[8] changes as desired. The 
+time for each instruction also meets our design. R0 has stayed as 0.
+So the program is working correctly.
+
+Output from ultra2_indirect:
+
+
+Time	PC	IR	opcode	R0	R1	R2	R3	MEM[6]	MEM[8]
+VCD info: dumpfile ultra2_indirect.vcd opened for output.
+0	   11	0011000000000001	00	    0	    0	    0	    0	    x	    x
+4	   11	0011000000000001	00	    0	    0	    0	    2	    x	    x
+Time                    5
+5	   12	0010110000000010	00	    0	    0	    0	    2	    x	    x
+9	   12	0010110000000010	00	    0	    0	   14	    2	    x	    x
+Time                   10
+10	   13	1010101000000000	00	    0	    0	   14	    2	    x	    x
+11	   13	1010101000000000	10	    0	    0	   14	    2	    x	    x
+13	   13	1010101000000000	10	    0	    0	   28	    2	    x	    x
+Time                   14
+14	   14	0110000000000110	10	    0	    0	   28	    2	    x	    x
+15	   14	0110000000000110	01	    0	    0	   28	    2	    x	    x
+17	   14	0110000000000110	01	    0	    0	   28	    2	   28	    x
+18	   15	0000000000000110	01	    0	    0	   28	    2	   28	    x
+19	   15	0000000000000110	00	    0	    0	   28	    2	   28	    x
+Time                   23
+23	   16	0110110000000110	00	    0	    0	   28	    2	   28	    x
+24	   16	0110110000000110	01	    0	    0	   28	    2	   28	    x
+26	   16	0110110000000110	01	    0	    0	   28	    2	   28	   28
+27	   17	1100110000001010	01	    0	    0	   28	    2	   28	   28
+28	   17	1100110000001010	11	    0	    0	   28	    2	   28	   28
+29	   12	1100110000001010	11	    0	    0	   28	    2	   28	   28
+30	   13	1010101000000000	11	    0	    0	   28	    2	   28	   28
+31	   13	1010101000000000	10	    0	    0	   28	    2	   28	   28
+33	   13	1010101000000000	10	    0	    0	   56	    2	   28	   28
+Time                   34
+34	   14	0110000000000110	10	    0	    0	   56	    2	   28	   28
+35	   14	0110000000000110	01	    0	    0	   56	    2	   28	   28
+37	   14	0110000000000110	01	    0	    0	   56	    2	   56	   28
+38	   15	0000000000000110	01	    0	    0	   56	    2	   56	   28
+39	   15	0000000000000110	00	    0	    0	   56	    2	   56	   28
+Time                   43
+43	   16	0110110000000110	00	    0	    0	   56	    2	   56	   28
+44	   16	0110110000000110	01	    0	    0	   56	    2	   56	   28
+46	   16	0110110000000110	01	    0	    0	   56	    2	   56	   56
+47	   17	1100110000001010	01	    0	    0	   56	    2	   56	   56
+48	   17	1100110000001010	11	    0	    0	   56	    2	   56	   56
+49	   12	1100110000001010	11	    0	    0	   56	    2	   56	   56
+50	   13	1010101000000000	11	    0	    0	   56	    2	   56	   56
+
+====================================================================================
+Exercise 2
+====================================================================================
+
+High level design of Ultra2 v3 with indirect addressing and fixed value R0
+and immediate load(LOADI) and relative jump(RJUMP).
+
+Instruction             # Clocks        Stages Used             Pseudocode
+LOAD  R[rd],M(R[rs])        5           IF, ID, EX, MEM, WB     R[rd] = MEM[R[rs]+M]
+STORE R[rd],M(R[rs])        4           IF, ID, EX, MEM         MEM[R[rs]+M] = R[rd]
+ADD   R[rd],R[rs],R[rt]     4           IF, ID, EX, WB          R[rd] = R[rs]+R[rt]
+JUMP  M(R[rs])              3           IF, ID, EX              PC = R[rs]+M
+
+LOADI R[rd],M               3           IF, ID, WB              R[rd] = M
+RJUMP M                     3           IF, ID, EX              PC = PC-M
+
+
+Encoding scheme:
+
+Load:
+When opcode is 2'b00, the processor will check rt, if rt is 00, it will
+continue as load from memory. If rt is 01, it will load immediate
+
+Jump:
+When opcode is 2'b11, the processor will check rt, if rt is 00, it will
+jump to the immediate. If rt is 01, it will jump to relative location to 
+the current PC.
+
+*Test code*
+
+	Assembly instruction             Encoded machine code
+	LOADI  R1, 3                    16'b0001000100000011
+	STORE  R1, 4                    16'b0101000000000100
+	LOADI  R2, -4                   16'b0010000111111100
+	ADD    R2, R2, R1               16'b1010100100000110
+	STORE  R2, 5                    16'b0110000000000101
+	RJUMP  -2                       16'b1100000111111101
+
+This peice of program initially loads 3 to R3, -4 to R2. Then it iteratively 
+adds R1 to R2 and store the result back to R2. As we can see from the output 
+file below, R2 changes as desired. The time for each instruction also meets 
+our design. So the program is working correctly.
+
+Time	PC	IR	opcode	R0	R1	R2	R3
+VCD info: dumpfile ultra2_indirect_immediate.vcd opened for output.
+0	   11	0001000100000011	00	    0	    0	    0	    0
+2	   11	0001000100000011	00	    0	    3	    0	    0
+Time                    3
+3	   12	0101000000000100	00	    0	    3	    0	    0
+4	   12	0101000000000100	01	    0	    3	    0	    0
+7	   13	0010000111111100	01	    0	    3	    0	    0
+8	   13	0010000111111100	00	    0	    3	    0	    0
+9	   13	0010000111111100	00	    0	    3	   -4	    0
+Time                   10
+10	   14	1010100100000110	00	    0	    3	   -4	    0
+11	   14	1010100100000110	10	    0	    3	   -4	    0
+13	   14	1010100100000110	10	    0	    3	   -1	    0
+Time                   14
+14	   15	0110000000000101	10	    0	    3	   -1	    0
+15	   15	0110000000000101	01	    0	    3	   -1	    0
+18	   16	1100000111111110	01	    0	    3	   -1	    0
+19	   16	1100000111111110	11	    0	    3	   -1	    0
+20	   13	1100000111111110	11	    0	    3	   -1	    0
+21	   14	1010100100000110	11	    0	    3	   -1	    0
+22	   14	1010100100000110	10	    0	    3	   -1	    0
+24	   14	1010100100000110	10	    0	    3	    2	    0
+Time                   25
+25	   15	0110000000000101	10	    0	    3	    2	    0
+26	   15	0110000000000101	01	    0	    3	    2	    0
+29	   16	1100000111111110	01	    0	    3	    2	    0
+30	   16	1100000111111110	11	    0	    3	    2	    0
+31	   13	1100000111111110	11	    0	    3	    2	    0
+32	   14	1010100100000110	11	    0	    3	    2	    0
+33	   14	1010100100000110	10	    0	    3	    2	    0
+35	   14	1010100100000110	10	    0	    3	    5	    0
+Time                   36
+36	   15	0110000000000101	10	    0	    3	    5	    0
+37	   15	0110000000000101	01	    0	    3	    5	    0
+40	   16	1100000111111110	01	    0	    3	    5	    0
+41	   16	1100000111111110	11	    0	    3	    5	    0
+42	   13	1100000111111110	11	    0	    3	    5	    0
+43	   14	1010100100000110	11	    0	    3	    5	    0
+44	   14	1010100100000110	10	    0	    3	    5	    0
+46	   14	1010100100000110	10	    0	    3	    8	    0
+Time                   47
+47	   15	0110000000000101	10	    0	    3	    8	    0
+48	   15	0110000000000101	01	    0	    3	    8	    0

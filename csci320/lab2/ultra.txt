@@ -1,0 +1,15 @@
+CSCI 320 - Computer Architecture
+Lab 2 - 9/10/13
+Author: Yifan Ge
+ultra.txt
+
+a. The ULTRA assembly statements are:
+	LOAD INPUT
+	STORE OUTPUT
+	ADD INCREMENT
+	JUMP 1
+
+b. One loop needs 14 clock cycles
+
+c. IPC = 3/(3+5+2) = 0.3
+	Instructions in steady-state: Store + Add + Jump

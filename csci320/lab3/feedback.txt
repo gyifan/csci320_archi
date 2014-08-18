@@ -1,0 +1,23 @@
+--------------------------------------------------------------------------------
+Total Score: 120 of 120
+ultra2.v updated (16 bit ISA, 4 GP reg, 256 word memory), ultra_design.txt created to reflect design.
+score 40 of 40
+
+
+ultra2.v works, output looks good, explain what is happening.
+score 10 of 10
+
+
+Indirect load/store/jump, R0 always zero.
+score 40 of 40
+
+
+sign_test.v correctly modified.
+score 10 of 10
+
+
+immediate load and relative jump implemented and documented.
+score 20 of 20
+
+
+--------------------------------------------------------------------------------

@@ -1,0 +1,125 @@
+CSCI 320 - Computer Architecture
+Lab 4 - Soreboard
+Author: Yifan Ge
+Original submission: 9/24/2013
+*edited: 10/7/2013
+
+======================================================
+Program Description:
+======================================================
+/* scoreboard */
+
+This implementation of scoreboard is based on instruction structure and register struct. 
+
+At the beginning, the program will read the instructions from the program file. It will set the 
+the function unit number and execution clock cycles from the config command. Then it parse the 
+instructions and initialize the array of instructions based on the input. The values in each
+instruction struct will be set accordingly. 
+
+These are the detailed description on the Reg and Instr structs.
+
+typedef struct{
+	int type; 	// either FLOAT or INT
+	int write;	// stores the instr index that is writing to it. initialized as -1
+	int read;	// stores the instr index that is reading it. if multiple instruction
+			// is reading it, it will restore the highest index. initialized as -1
+} Reg;
+
+typedef struct{
+	int updateRD;   // finished reading, need update.
+	int updateWR;	// just finished writeback, need update.
+	int done;	// initialized as 0;
+	int issued;	// initialized as 0;
+	int* fu; 	// Function unit
+	Reg* rd;	// Destination register
+	Reg* rs1;	// Source register 1
+	Reg* rs2;	// Source register 2
+	int counterEX;	// initiated as -1, counts how many clocks in EX
+	int clockEX;	// clock needed for this executing instruction
+	int waitIndex;	// instruction index this instruction is waiting. Default(-1)
+	int issue;	// clock cycle issued, default -1
+	int read;	// clock cycle read operands, default -1
+	int ex;		// clock cycle executed operands, default -1
+	int wb;		// clack cycle wroteback, default -1
+	char name[20];	// stores the name of the instruction;
+} Instr;
+
+Before processing. the program will initialize pc and clock to 0. These variable will keep track the 
+current pc and clock cycle. The main processing process can be categorize into two parts:issue, and
+process. The program will execute issue and process once per loop and increment the clock cycle, until
+all the instructions are finished OR the maximum clock cycle is reached. 
+
+During issue stage, the processor will try to issue the instruction at the pc index. If it's 
+successfully issued, the pc is incremented. Otherwise the pc stays and processor will try to issue
+the same instruction again next clock cycle.
+
+During processing stage, the processor will loop through all the ISSUED instruction once. Only if the 
+done property in the instruction struct is not set, the processor will process the instruction and 
+updates its values in the structs. Since the register in the struct are stored as pointers, the processor
+will be able to check and update the register status list as well. The usage of pointers is the novel 
+part of this C implementation.
+
+After all instructions are executed it will prints the issue, read, ex, and wb properties of each 
+instruction, which should contains the clock cycles when each stage finished. 
+
+
+==========================================================
+Program Usage
+==========================================================
+
+To use this score board implementation, the user can use the following command:
+
+	$ scoreboard nameOfProgramFile 
+
+The program file contains the scoreboard configuration and instructions. The following rules are 
+required:
+	1. The configuration are set at the beginning of the program file. The user will be able to set
+	   .integer, .mult, .add, .div. 
+	   e.g.
+	         .integer numberOfUnit executionCycles
+	2. The instructions have to be supported by the program. This is the current supported instruction
+	   list:
+		LD		Fi, i(Rk)
+		MULTD		Fi, Fj, Fk
+		ADDD		Fi, Fj, Fk
+		SUBD		Fi, Fj, Fk
+		DIVD		Fi, Fj, Fk
+
+==========================================================
+Example 
+==========================================================
+
+Following is the output for processing the sample.code in the data directory.
+
+Command:
+	$ ./bin/scoreboard ./data/sample.code
+ 
+Output:
+
+Initializing the Scoreboard Parameters ... ...
+Finished initialization 
+Loading program ../data/sample.code ... ... 
+loaded LD    F6,  34(R2)
+loaded LD    F2,  45(R3)
+loaded MULTD F0,  F2, F4
+loaded SUBD  F8,  F6, F2
+loaded DIVD  F10, F0, F6
+loaded ADDD  F6,  F8, F2
+==================================
+ Executing ... ... 
+==================================
+==================================
+ Execution is DONE! 
+==================================
+
+ Printing Results ... ...
+===============================================================
+                                  	Read		Execute		Write
+                            Issue	Operands	Complete	Result
+                      --------------------------------------------------------------
+LD    F6,  34(R2)		1		2		3		4
+LD    F2,  45(R3)		5		6		7		8
+MULTD F0,  F2, F4		6		9		19		20
+SUBD  F8,  F6, F2		7		9		11		12
+DIVD  F10, F0, F6		8		21		61		62
+ADDD  F6,  F8, F2		13		14		16		22
